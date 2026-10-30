@@ -625,5 +625,19 @@ day=todayISO();applyTheme();render();check();setInterval(check,15000);setInterva
 setTimeout(()=>{loading=false;if(view==='tasks')render()},350);
 if('serviceWorker' in navigator&&location.protocol!=='file:'){addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{}))}
 </script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(registration => {
+        console.log("MONO service worker registered:", registration.scope);
+      })
+      .catch(error => {
+        console.error("MONO service worker failed:", error);
+      });
+  });
+}
+</script>
 </body>
 </html>
