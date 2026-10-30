@@ -639,5 +639,18 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const MONO_SUPABASE_URL = "sb_secret_ka-1pXwCrXlMA5oJTvZzAw_mRGPjFy4";
+const MONO_SUPABASE_KEY = "sb_publishable_slPZL-oR2jL6aXOBYNPIfA_2DpZIbNl";
+
+const monoDB = window.supabase.createClient(
+  MONO_SUPABASE_URL,
+  MONO_SUPABASE_KEY
+);
+</script>
+
 </body>
 </html>
