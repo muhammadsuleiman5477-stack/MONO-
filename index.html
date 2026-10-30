@@ -652,5 +652,255 @@ const monoDB = window.supabase.createClient(
 );
 </script>
 
+<!-- MONO ACCOUNT INTERFACE -->
+
+<style>
+#mono-account-btn {
+  position:fixed;
+  top:15px;
+  right:15px;
+  z-index:99998;
+  background:#c9a34a;
+  color:#000;
+  padding:12px 18px;
+  border:0;
+  border-radius:25px;
+  font-weight:bold;
+}
+
+#mono-login-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  background:rgba(0,0,0,.9);
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+#mono-login-box {
+  background:#151515;
+  color:white;
+  border:1px solid #c9a34a;
+  border-radius:18px;
+  padding:25px;
+  width:100%;
+  max-width:380px;
+  box-sizing:border-box;
+}
+
+#mono-login-box input {
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  padding:14px;
+  margin:12px 0;
+  background:#252525;
+  color:white;
+  border:1px solid #555;
+  border-radius:8px;
+}
+
+#mono-login-box button {
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  border:0;
+  border-radius:8px;
+  background:#c9a34a;
+  color:black;
+  font-weight:bold;
+}
+
+#mono-login-box .secondary {
+  background:#333;
+  color:white;
+}
+</style>
+
+<button id="mono-account-btn">My Account</button>
+
+<div id="mono-login-overlay">
+  <div id="mono-login-box">
+    <h1 style="color:#c9a34a">MONO</h1>
+    <h3 id="mono-auth-heading">Welcome Back</h3>
+
+    <input id="mono-fullname"
+      placeholder="Full name"
+      style="display:none">
+
+    <input id="mono-auth-email"
+      type="email"
+      placeholder="Email address">
+
+    <input id="mono-auth-password"
+      type="password"
+      placeholder="Password">
+
+    <p id="mono-auth-status"></p>
+
+    <button id="mono-auth-submit">Sign In</button>
+    <button id="mono-auth-toggle">Create Account</button>
+    <button id="mono-auth-forgot" class="secondary">
+      Forgot Password?
+    </button>
+    <button id="mono-auth-close" class="secondary">
+      Close
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const db = monoDB;
+
+  const overlay = document.getElementById("mono-login-overlay");
+  const accountBtn = document.getElementById("mono-account-btn");
+  const status = document.getElementById("mono-auth-status");
+  const heading = document.getElementById("mono-auth-heading");
+  const submit = document.getElementById("mono-auth-submit");
+  const toggle = document.getElementById("mono-auth-toggle");
+  const nameInput = document.getElementById("mono-fullname");
+  const emailInput = document.getElementById("mono-auth-email");
+  const passwordInput = document.getElementById("mono-auth-password");
+
+  let mode = "signin";
+
+  function notify(text) {
+    status.textContent = text;
+  }
+
+  function updateForm() {
+    heading.textContent =
+      mode === "signup" ? "Create Your Account" : "Welcome Back";
+
+    submit.textContent =
+      mode === "signup" ? "Create Account" : "Sign In";
+
+    toggle.textContent =
+      mode === "signup" ? "Already registered? Sign In" : "Create Account";
+
+    nameInput.style.display =
+      mode === "signup" ? "block" : "none";
+  }
+
+  accountBtn.onclick = async function () {
+    const {data, error} = await db.auth.getUser();
+
+    if (error) {
+      notify(error.message);
+      overlay.style.display = "flex";
+      return;
+    }
+
+    if (data.user) {
+      if (confirm("Sign out of MONO?")) {
+        const {error} = await db.auth.signOut();
+        if (error) alert(error.message);
+      }
+    } else {
+      overlay.style.display = "flex";
+    }
+  };
+
+  document.getElementById("mono-auth-close").onclick = function () {
+    overlay.style.display = "none";
+  };
+
+  toggle.onclick = function () {
+    mode = mode === "signin" ? "signup" : "signin";
+    notify("");
+    updateForm();
+  };
+
+  submit.onclick = async function () {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    const fullname = nameInput.value.trim();
+
+    if (!email || !password) {
+      notify("Enter your email and password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      notify("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (mode === "signup" && !fullname) {
+      notify("Enter your full name.");
+      return;
+    }
+
+    submit.disabled = true;
+    notify("Please wait...");
+
+    try {
+      let result;
+
+      if (mode === "signup") {
+        result = await db.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {full_name: fullname}
+          }
+        });
+      } else {
+        result = await db.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+      }
+
+      if (result.error) {
+        notify(result.error.message);
+      } else if (mode === "signup" && !result.data.session) {
+        notify("Account created! Check your email to verify it.");
+      } else {
+        overlay.style.display = "none";
+        notify("Welcome to MONO!");
+      }
+    } catch (error) {
+      notify("Something went wrong. Please try again.");
+    } finally {
+      submit.disabled = false;
+    }
+  };
+
+  document.getElementById("mono-auth-forgot").onclick =
+    async function () {
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        notify("Enter your email first.");
+        return;
+      }
+
+      const {error} = await db.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+
+      notify(error ? error.message : "Check your email.");
+    };
+
+  db.auth.onAuthStateChange(function (event, session) {
+    accountBtn.textContent = session ? "Sign Out" : "My Account";
+  });
+
+  db.auth.getSession().then(function ({data}) {
+    accountBtn.textContent =
+      data.session ? "Sign Out" : "My Account";
+  });
+
+  updateForm();
+})();
+</script>
+
+<!-- END MONO ACCOUNT INTERFACE -->
+
+
 </body>
 </html>
